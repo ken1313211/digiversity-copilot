@@ -1738,11 +1738,58 @@ async function renderPlayerResultPanel(session) {
     } catch (err) { console.error(err); }
 }
 
-function listUIFinalLeaderboard(session) {
-    const listUI = document.getElementById("player-lb-list");
-    listUI.innerHTML = "";
-    document.getElementById("player-lb-msg").innerText = "Match concluded! Evaluation complete.";
+async function listUIFinalLeaderboard(session) {
+    document.getElementById("player-lb-msg").innerText = "Match concluded! Final Standings:";
     switchView("playerLeaderboard");
+    
+    if (!isFirebaseEnabled) return;
+    try {
+        const playersSnapshot = await get(ref(database, `sessions/${currentSessionPin}/players`));
+        const listUI = document.getElementById("player-lb-list");
+        listUI.innerHTML = "";
+        
+        if (playersSnapshot.exists()) {
+            const array = Object.entries(playersSnapshot.val()).map(([key, val]) => ({ key, ...val }));
+            array.sort((a, b) => b.score - a.score);
+            
+            const myIndex = array.findIndex(p => p.key === myPlayerKey);
+            
+            let displaySet = new Set();
+            for(let i=0; i<3 && i<array.length; i++) displaySet.add(i);
+            
+            if(myIndex !== -1) {
+                if(myIndex - 1 >= 0) displaySet.add(myIndex - 1);
+                displaySet.add(myIndex);
+                if(myIndex + 1 < array.length) displaySet.add(myIndex + 1);
+            }
+            
+            let sortedIndices = Array.from(displaySet).sort((a,b) => a-b);
+            let lastIdx = -1;
+            
+            sortedIndices.forEach(idx => {
+                if(lastIdx !== -1 && idx > lastIdx + 1) {
+                    const dots = document.createElement("div");
+                    dots.className = "text-muted text-center my-2";
+                    dots.innerText = "• • •";
+                    listUI.appendChild(dots);
+                }
+                
+                const player = array[idx];
+                const row = document.createElement("div");
+                row.className = "leaderboard-row fade-in-up";
+                if (player.key === myPlayerKey) {
+                    row.style.background = "rgba(0, 230, 242, 0.2)";
+                    row.style.border = "1px solid var(--color-cyan)";
+                }
+                row.innerHTML = `<span>#${idx + 1} ${player.nickname}</span><span>${player.score} pts</span>`;
+                listUI.appendChild(row);
+                
+                lastIdx = idx;
+            });
+        }
+    } catch(err) {
+        console.error(err);
+    }
 }
 
 // ==========================================
