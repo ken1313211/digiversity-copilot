@@ -605,6 +605,28 @@ async function loadPresetsFromFirebase() {
     }
 }
 
+async function loadHistoryFromFirebase() {
+    if (!isFirebaseEnabled) return null;
+    try {
+        const snap = await get(ref(database, 'quizzes/globalHistory'));
+        if (snap.exists()) {
+            return snap.val();
+        }
+    } catch (err) {
+        console.warn("Firebase history load failed:", err);
+    }
+    return null;
+}
+
+async function syncHistoryToFirebase(historyData) {
+    if (!isFirebaseEnabled) return;
+    try {
+        await set(ref(database, 'quizzes/globalHistory'), historyData);
+    } catch (err) {
+        console.warn("Firebase history sync failed:", err);
+    }
+}
+
 async function enterHostDashboard() {
     currentRole = "host";
     await loadPresetsFromFirebase();
@@ -612,13 +634,19 @@ async function enterHostDashboard() {
     renderQuizSelector();
     
     let history = [];
-    try {
-        const savedHistory = localStorage.getItem("copilot_recent_sessions");
-        if (savedHistory) {
-            history = JSON.parse(savedHistory);
+    const fbHistory = await loadHistoryFromFirebase();
+    if (fbHistory) {
+        history = fbHistory;
+        try { localStorage.setItem("copilot_recent_sessions", JSON.stringify(history)); } catch (e) {}
+    } else {
+        try {
+            const savedHistory = localStorage.getItem("copilot_recent_sessions");
+            if (savedHistory) {
+                history = JSON.parse(savedHistory);
+            }
+        } catch (e) {
+            history = [];
         }
-    } catch (e) {
-        history = [];
     }
 
     let workshops = 0;
@@ -660,7 +688,7 @@ async function enterHostDashboard() {
             });
 
             historyList.querySelectorAll(".btn-delete-session").forEach(btn => {
-                btn.addEventListener("click", (e) => {
+                btn.addEventListener("click", async (e) => {
                     e.stopPropagation();
                     const targetIdx = parseInt(e.currentTarget.getAttribute("data-index"));
                     if (confirm("Are you sure you want to delete this session record?")) {
@@ -668,6 +696,7 @@ async function enterHostDashboard() {
                         try {
                             localStorage.setItem("copilot_recent_sessions", JSON.stringify(history));
                         } catch (err) {}
+                        await syncHistoryToFirebase(history);
                         enterHostDashboard();
                     }
                 });
@@ -1299,7 +1328,7 @@ async function presentHostLeaderboardView() {
         backBtn.classList.remove("hidden");
         backBtn.innerText = "Conclude Workshop Session";
         await update(gameSessionRef, { status: "gameover" });
-        backBtn.onclick = () => {
+        backBtn.onclick = async () => {
             const playersCount = playersSnapshot.exists() ? Object.keys(playersSnapshot.val()).length : 0;
             const correctRatio = sessionTotalAnswersCount > 0 ? (sessionTotalCorrectAnswersCount / sessionTotalAnswersCount) : 0.92;
             const sessionScorePercent = Math.round(correctRatio * 100);
@@ -1322,7 +1351,8 @@ async function presentHostLeaderboardView() {
             try {
                 localStorage.setItem("copilot_recent_sessions", JSON.stringify(history));
             } catch (err) {}
-
+            
+            await syncHistoryToFirebase(history);
             terminateRoomInstance();
         };
     }
