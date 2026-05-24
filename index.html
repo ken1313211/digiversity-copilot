@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CopilotQuiz | Interactive Live Game</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="app.js?v=4"></script>
+</head>
+
+<body>
+    <div id="background-animation">
+        <div class="bg-grid"></div>
+        <div class="data-node node-1"></div>
+        <div class="data-node node-2"></div>
+        <div class="data-node node-3"></div>
+        <div class="bg-particle" style="left:10%;top:80%;animation-delay:0s;background:#00E6F2;"></div>
+        <div class="bg-particle" style="left:25%;top:90%;animation-delay:1.5s;background:#8764B8;width:6px;height:6px;"></div>
+        <div class="bg-particle" style="left:45%;top:85%;animation-delay:3s;background:#0F6CBD;"></div>
+        <div class="bg-particle" style="left:60%;top:75%;animation-delay:0.8s;background:#00E6F2;width:3px;height:3px;"></div>
+        <div class="bg-particle" style="left:75%;top:88%;animation-delay:2.2s;background:#FFD700;width:5px;height:5px;"></div>
+        <div class="bg-particle" style="left:85%;top:70%;animation-delay:4s;background:#8764B8;"></div>
+        <div class="bg-particle" style="left:35%;top:60%;animation-delay:5s;background:#00E6F2;width:3px;height:3px;"></div>
+        <div class="bg-particle" style="left:90%;top:50%;animation-delay:2.5s;background:#0F6CBD;width:6px;height:6px;"></div>
+        <!-- Shooting stars -->
+        <div class="shooting-star" style="top:15%;left:0;animation-delay:0s;"></div>
+        <div class="shooting-star" style="top:35%;left:0;animation-delay:2s;width:120px;background:linear-gradient(90deg,rgba(135,100,184,0.6),transparent);"></div>
+        <div class="shooting-star" style="top:55%;left:0;animation-delay:5s;"></div>
+        <div class="shooting-star" style="top:80%;left:0;animation-delay:7s;width:60px;background:linear-gradient(90deg,rgba(255,215,0,0.5),transparent);"></div>
+        <div class="shooting-star" style="top:25%;left:0;animation-delay:3.5s;width:100px;"></div>
+    </div>
+
+    <main id="app-container">
+
+        <section id="view-landing" class="view active">
+            <div class="glass-panel text-center fade-in-up premium-landing-panel" style="max-width: 500px;">
+                <div class="breathing-logo">
+                    <h1 class="logo-title">Copilot<span>Quiz</span></h1>
+                </div>
+                <p class="subtitle mt-2 text-small typing-effect">Digiversity 2026 | Interactive AI Icebreaker</p>
+
+                <div class="action-buttons mt-4">
+                    <button id="btn-goto-join" class="btn btn-primary btn-large w-full glow-btn">Join Game</button>
+                    <div class="divider"><span>OR</span></div>
+                    <button id="btn-goto-login" class="btn btn-secondary w-full hover-glow">Host Game</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-admin-login" class="view">
+            <div class="glass-panel text-center fade-in-up">
+                <h2 class="mb-4">Admin Login</h2>
+                <form id="form-admin-login" class="flex-col gap-3">
+                    <input type="password" id="input-admin-password" placeholder="Master Password" required
+                        autocomplete="current-password">
+                    <button type="submit" id="btn-admin-login" class="btn btn-primary w-full mt-2">Log In</button>
+                </form>
+                <button id="btn-back-landing-login" class="btn-text mt-4">Back</button>
+            </div>
+        </section>
+
+        <section id="view-player-join" class="view">
+            <div class="glass-panel text-center fade-in-up">
+                <h2 class="mb-4">Join the Session</h2>
+                <form id="form-join" class="flex-col gap-3">
+                    <input type="text" id="input-pin" placeholder="Game PIN" required autocomplete="off"
+                        inputmode="numeric">
+                    <input type="text" id="input-nickname" placeholder="Nickname" required autocomplete="off"
+                        maxlength="15">
+                    <button type="submit" class="btn btn-primary w-full mt-2" id="btn-join-submit">Enter</button>
+                </form>
+                <button id="btn-back-landing-player" class="btn-text mt-3">Back</button>
+            </div>
+        </section>
+
+        <section id="view-player-lobby" class="view">
+            <div class="glass-panel text-center fade-in-up">
+                <h2 class="pulse-text">You're in!</h2>
+                <p class="mt-2 text-muted">See your nickname on screen.</p>
+                <div class="player-avatar mt-4" id="display-player-name">Name</div>
+                <p class="mt-4 text-small">Waiting for host to start...</p>
+                <div class="emoji-bar flex-center gap-3 mt-4" id="player-lobby-emoji-bar">
+                    <button class="btn-emoji lobby-emoji" data-emoji="👋">👋</button>
+                    <button class="btn-emoji lobby-emoji" data-emoji="🚀">🚀</button>
+                    <button class="btn-emoji lobby-emoji" data-emoji="💡">💡</button>
+                    <button class="btn-emoji lobby-emoji" data-emoji="✨">✨</button>
+                    <button class="btn-emoji lobby-emoji" data-emoji="🤖">🤖</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-player-question" class="view player-game-view">
+            <div class="player-header" style="justify-content: space-between; align-items: flex-start; display: flex; width: 100%;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div id="player-question-number" style="font-size: 0.85rem; color: rgba(255,255,255,0.7); font-weight: 500;">Question 1 of X</div>
+                    <div class="player-score" style="margin: 0;">Score: <span id="player-score-display">0</span></div>
+                    <div id="player-streak-badge" class="hidden"
+                        style="color: var(--color-cyan); font-weight: bold; background: rgba(0,0,0,0.5); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.8rem; align-self: flex-start;">
+                        🔥 Streak: x<span id="player-streak-count">0</span>
+                    </div>
+                </div>
+                <div style="text-align: right; background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="font-size: 0.75rem; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.25rem;">Potential Points</div>
+                    <div id="player-potential-points" style="font-size: 1.5rem; font-weight: 800; color: var(--color-cyan); font-variant-numeric: tabular-nums;">1000</div>
+                </div>
+            </div>
+            <div id="player-input-mc" class="answer-grid">
+                <button class="answer-btn shape-triangle color-blue" data-index="0">
+                    <svg viewBox="0 0 100 100">
+                        <polygon points="50,15 90,85 10,85" fill="currentColor" />
+                    </svg>
+                </button>
+                <button class="answer-btn shape-diamond color-purple" data-index="1">
+                    <svg viewBox="0 0 100 100">
+                        <polygon points="50,10 90,50 50,90 10,50" fill="currentColor" />
+                    </svg>
+                </button>
+                <button class="answer-btn shape-circle color-cyan" data-index="2">
+                    <svg viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" fill="currentColor" />
+                    </svg>
+                </button>
+                <button class="answer-btn shape-square color-darkblue" data-index="3">
+                    <svg viewBox="0 0 100 100">
+                        <rect x="15" y="15" width="70" height="70" fill="currentColor" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="player-input-tf" class="answer-grid hidden" style="grid-template-columns: 1fr; grid-template-rows: 1fr 1fr;">
+                <button class="answer-btn shape-triangle color-blue flex-center gap-3" data-index="0" style="flex-direction: row;">
+                    <svg viewBox="0 0 100 100" style="max-width: 60px;">
+                        <polygon points="50,15 90,85 10,85" fill="currentColor" />
+                    </svg>
+                    <span style="font-size: 2rem; font-weight: bold; color: white;">True</span>
+                </button>
+                <button class="answer-btn shape-diamond color-purple flex-center gap-3" data-index="1" style="flex-direction: row;">
+                    <svg viewBox="0 0 100 100" style="max-width: 60px;">
+                        <polygon points="50,10 90,50 50,90 10,50" fill="currentColor" />
+                    </svg>
+                    <span style="font-size: 2rem; font-weight: bold; color: white;">False</span>
+                </button>
+            </div>
+
+            <div id="player-input-jumbled" class="hidden w-full" style="flex: 1; display: flex; flex-direction: column; gap: 1rem; padding: 1rem;">
+                <div class="glass-panel w-full text-center" style="flex: 1; display: flex; flex-direction: column; max-width: none;">
+                    <h4 class="mb-2" style="color: var(--color-cyan);">Your Prompt:</h4>
+                    <div id="player-jumbled-constructed" class="flex-center gap-2" style="flex: 1; align-items: flex-start; align-content: flex-start; border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px; padding: 1rem; min-height: 100px;"></div>
+                </div>
+                <div class="glass-panel w-full text-center" style="flex: 1; display: flex; flex-direction: column; max-width: none;">
+                    <h4 class="mb-2">Available Fragments:</h4>
+                    <div id="player-jumbled-available" class="flex-center gap-2" style="flex: 1; align-items: flex-start; align-content: flex-start;"></div>
+                </div>
+            </div>
+
+            <div id="player-input-text" class="hidden w-full" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem;">
+                <div class="glass-panel text-center w-full" style="max-width: 500px;">
+                    <h3 class="mb-4" style="color: var(--color-cyan);">Type your answer:</h3>
+                    <input type="text" id="input-type-answer" class="mb-4" placeholder="Enter answer here..." autocomplete="off">
+                    <button class="btn btn-primary w-full btn-large" id="btn-submit-type-answer">Submit Answer</button>
+                </div>
+            </div>
+
+            <div id="player-input-number" class="hidden w-full" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem;">
+                <div class="glass-panel text-center w-full" style="max-width: 500px;">
+                    <h3 class="mb-4" style="color: var(--color-cyan);">Tune the Temperature:</h3>
+                    <div style="font-size: 3rem; font-weight: bold; margin-bottom: 1rem;" id="display-number-guess">0.5</div>
+                    <input type="range" id="input-number-guess" min="0" max="1" step="0.1" value="0.5" style="width: 100%; margin-bottom: 2rem;">
+                    <button class="btn btn-primary w-full btn-large" id="btn-submit-number-guess">Submit Tuning</button>
+                </div>
+            </div>
+
+            <div id="player-input-poll" class="hidden w-full" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem;">
+                <div class="glass-panel text-center w-full" style="max-width: 560px;">
+                    <h3 class="mb-2" style="color: var(--color-cyan);">📊 Your Opinion:</h3>
+                    <p class="text-muted text-small mb-4">No wrong answer – just pick what you think!</p>
+                    <div id="player-poll-options" class="flex-col gap-2"></div>
+                </div>
+            </div>
+
+            <div id="player-input-speedmath" class="hidden w-full" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem;">
+                <div class="glass-panel text-center w-full" style="max-width: 480px;">
+                    <h3 class="mb-2" style="color: var(--color-cyan);">⛳ Prompt Golf</h3>
+                    <div id="player-math-equation" style="font-size: 1.25rem; font-weight: 500; margin: 1rem 0; color: #cbd5e1;">Achieve the goal using the shortest prompt possible!</div>
+                    <textarea id="input-speedmath-answer" class="mb-4" placeholder="Type your prompt..." style="width: 100%; min-height: 120px; border-radius: 8px; padding: 0.75rem; background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.1);"></textarea>
+                    <button class="btn btn-primary w-full btn-large" id="btn-submit-speedmath">Submit Prompt</button>
+                </div>
+            </div>
+
+            <div id="player-waiting-msg" class="glass-panel text-center hidden">
+                <h3>Waiting for others...</h3>
+            </div>
+        </section>
+
+        <section id="view-player-result" class="view">
+            <div id="player-result-panel" class="glass-panel text-center fade-in-up">
+                <h1 id="player-result-title">Correct!</h1>
+                <div class="points-badge mt-2">+<span id="player-points-earned">500</span></div>
+                <div id="player-result-streak-msg" class="text-small mt-2 hidden"
+                    style="color: var(--color-cyan); font-weight: bold;">🔥 Streak Multiplier Active!</div>
+                <div class="rank-badge mt-3" id="player-rank-badge">
+                    <div>
+                        <div class="rank-label">Your Rank</div>
+                        <div class="rank-number">#<span id="player-rank-number">-</span></div>
+                    </div>
+                    <div class="rank-total">of <span id="player-rank-total">-</span></div>
+                    <div id="player-rank-movement" class="rank-movement same">— same</div>
+                </div>
+                <p class="mt-3">Current Score: <span id="player-total-score">500</span></p>
+                <p class="mt-3 text-small">Look at the screen.</p>
+            </div>
+        </section>
+
+        <section id="view-player-leaderboard" class="view">
+            <div class="glass-panel text-center fade-in-up">
+                <h2 id="player-lb-title">Leaderboard</h2>
+                <div id="player-lb-list" class="leaderboard-container mt-4 mb-4"></div>
+                <p class="text-small text-muted mt-2 mb-4" id="player-lb-msg">Waiting for host...</p>
+
+                <div class="emoji-bar flex-center gap-3" id="player-emoji-bar">
+                    <button class="btn-emoji" data-emoji="❤️">❤️</button>
+                    <button class="btn-emoji" data-emoji="👏">👏</button>
+                    <button class="btn-emoji" data-emoji="🤖">🤖</button>
+                    <button class="btn-emoji" data-emoji="🔥">🔥</button>
+                    <button class="btn-emoji" data-emoji="✨">✨</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-host-setup" class="view host-layout" style="overflow-y: auto;">
+            <div class="glass-panel container-large fade-in-up" style="max-width: 1400px; width: 95%;">
+                <div class="flex-between mb-4 pb-3" style="border-bottom: 1px solid var(--glass-border);">
+                    <h2>Admin Dashboard</h2>
+                    <button id="btn-admin-logout" class="btn-text text-muted" style="font-size: 0.9rem;">Sign
+                        Out</button>
+                </div>
+
+                <div class="metrics-grid mb-4">
+                    <div class="metric-card">
+                        <div class="metric-value" id="metric-workshops">0</div>
+                        <div class="metric-label">Workshops Hosted</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metric-players">0</div>
+                        <div class="metric-label">Total Participants</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metric-score">0</div>
+                        <div class="metric-label">Avg Engagement Score</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-split">
+                    <div class="dashboard-col">
+                        <div class="flex-between mb-3">
+                            <h3>My Quizzes</h3>
+                            <button id="btn-open-maker" class="btn btn-secondary text-small">+ New Quiz</button>
+                        </div>
+                        <div id="custom-quizzes-list" class="flex-col gap-3">
+                            <p class="text-muted text-small text-center">Loading quizzes...</p>
+                        </div>
+                        <div class="mt-4">
+                            <button class="btn btn-secondary w-full" id="btn-import-presets">⬇ Import Copilot
+                                Modules</button>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-col">
+                        <h3 class="mb-3">Recent Sessions</h3>
+                        <div class="history-table-container">
+                            <table class="history-table w-full">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Quiz</th>
+                                        <th>Players</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-list">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted text-small py-3">No recent
+                                            sessions found.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex-between">
+                    <button id="btn-back-landing-host" class="btn-text">Back to Home</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-admin-maker" class="view host-layout maker-view-layout">
+            <!-- Sidebar: Game type picker -->
+            <div class="maker-sidebar glass-panel fade-in-up">
+                <h3 class="mb-3" style="color: var(--color-cyan);">🎮 Question Types</h3>
+                <p class="text-small text-muted mb-4">Click a type to add it to your quiz.</p>
+
+                <button class="maker-type-btn" data-type="multiple-choice">
+                    <span class="maker-type-icon">🔠</span>
+                    <div><strong>Knowledge Check</strong><p>Standard AI Concept Quiz</p></div>
+                </button>
+                <button class="maker-type-btn" data-type="true-false">
+                    <span class="maker-type-icon">✅</span>
+                    <div><strong>Fact or Hallucination</strong><p>Binary validity check</p></div>
+                </button>
+                <button class="maker-type-btn" data-type="jumbled-prompt">
+                    <span class="maker-type-icon">🔀</span>
+                    <div><strong>Prompt Assembly</strong><p>Order the fragments</p></div>
+                </button>
+                <button class="maker-type-btn" data-type="type-answer">
+                    <span class="maker-type-icon">⌨️</span>
+                    <div><strong>Exact Output</strong><p>Precise string match</p></div>
+                </button>
+                <button class="maker-type-btn" data-type="number-guess">
+                    <span class="maker-type-icon">🎯</span>
+                    <div><strong>Token Estimator</strong><p>Slider estimation</p></div>
+                </button>
+                <button class="maker-type-btn" data-type="poll">
+                    <span class="maker-type-icon">📊</span>
+                    <div><strong>Usage Poll</strong><p>No wrong answer</p></div>
+                </button>
+                <button class="maker-type-btn" data-type="speed-math">
+                    <span class="maker-type-icon">⚡</span>
+                    <div><strong>Logic Processing</strong><p>Fast arithmetic</p></div>
+                </button>
+            </div>
+
+            <!-- Main: Canvas area -->
+            <div class="maker-canvas glass-panel fade-in-up">
+                <div class="mb-4" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
+                    <label style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem; display: block;">Quiz Title</label>
+                    <input type="text" id="maker-quiz-title" placeholder="Enter your quiz name..." style="font-size: 1.4rem; font-weight: bold; background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); width: 100%; padding: 0.75rem 1rem; color: white; margin-bottom: 1rem;">
+                    <div class="flex gap-2">
+                        <button id="btn-preview-quiz" class="btn btn-secondary">👁️ Preview Quiz</button>
+                        <button id="btn-save-quiz" class="btn btn-primary glow-btn">💾 Save Quiz</button>
+                        <button id="btn-close-maker" class="btn btn-secondary">✕ Close</button>
+                    </div>
+                </div>
+
+                <div id="maker-questions-container" class="flex-col gap-3" style="overflow-y: auto; flex: 1; padding-right: 0.5rem; min-height: 200px;">
+                    <div id="maker-empty-state" class="maker-empty-state">
+                        <div style="font-size: 4rem; margin-bottom: 1rem;">🎮</div>
+                        <h3 style="color: var(--color-cyan);">Start Building!</h3>
+                        <p class="text-muted mt-2">Click any question type on the left to add it here.</p>
+                    </div>
+                </div>
+
+                <div class="mt-3 text-center text-muted text-small" id="maker-q-count">0 questions added</div>
+            </div>
+        </section>
+
+        <section id="view-host-lobby" class="view host-layout" style="position: relative; overflow: hidden;">
+            <div id="host-lobby-emoji-container"
+                style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;">
+            </div>
+            <div class="lobby-header glass-panel" style="position: relative; z-index: 1;">
+                <div class="flex-between w-full mb-3">
+                    <button id="btn-cancel-session" class="btn-text" style="color: #ef4444; font-size: 0.9rem;">← Cancel
+                        Session</button>
+                </div>
+                <div class="lobby-pin-container">
+                    <span id="display-join-url">Join at <strong>...</strong> with PIN:</span>
+                    <h1 id="display-game-pin" class="massive-pin">---</h1>
+                </div>
+                <div class="lobby-qr" id="qr-code-container"></div>
+            </div>
+
+            <div class="lobby-main glass-panel mt-4" style="position: relative; z-index: 1;">
+                <div class="flex-between w-full mb-3">
+                    <h3>Players (<span id="player-count">0</span>)</h3>
+                    <button id="btn-start-game" class="btn btn-primary" disabled>Start Game</button>
+                </div>
+                <div id="player-list" class="player-grid"></div>
+            </div>
+        </section>
+
+        <section id="view-host-question" class="view host-layout">
+            <div class="question-header glass-panel w-full mb-4 fade-in-up" id="host-question-header"
+                style="max-width: 1000px; display: flex; justify-content: space-between; align-items: center; padding: 2rem; font-size: 1.5rem; position: relative;">
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1;">
+                    <div id="host-question-number" style="font-size: 1rem; color: rgba(255,255,255,0.7); font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">Question 1 of X</div>
+                    <h2 id="host-question-text" style="margin: 0;">Question Text</h2>
+                </div>
+                <div class="timer-circle" id="host-timer" style="margin: 0 2rem;">20</div>
+                <button id="btn-host-end-game-early" class="btn btn-secondary" style="background: #ef4444; border-color: #ef4444; font-size: 0.9rem; padding: 0.5rem 1rem;">End Game</button>
+            </div>
+            <div id="host-question-image-container" class="mb-4 hidden fade-in-up">
+                <img id="host-question-image" src=""
+                    style="max-height: 250px; max-width: 100%; object-fit: contain; border-radius: var(--radius-md); box-shadow: var(--glass-shadow);">
+            </div>
+            <div id="host-ans-container-mc" class="answers-layout mt-4">
+                <div class="host-answer-card color-blue">
+                    <div class="shape"><svg viewBox="0 0 100 100">
+                            <polygon points="50,15 90,85 10,85" fill="white" />
+                        </svg></div>
+                    <span id="host-ans-0">Answer A</span>
+                </div>
+                <div class="host-answer-card color-purple">
+                    <div class="shape"><svg viewBox="0 0 100 100">
+                            <polygon points="50,10 90,50 50,90 10,50" fill="white" />
+                        </svg></div>
+                    <span id="host-ans-1">Answer B</span>
+                </div>
+                <div class="host-answer-card color-cyan">
+                    <div class="shape"><svg viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="white" />
+                        </svg></div>
+                    <span id="host-ans-2">Answer C</span>
+                </div>
+                <div class="host-answer-card color-darkblue">
+                    <div class="shape"><svg viewBox="0 0 100 100">
+                            <rect x="15" y="15" width="70" height="70" fill="white" />
+                        </svg></div>
+                    <span id="host-ans-3">Answer D</span>
+                </div>
+            </div>
+
+            <div id="host-ans-container-tf" class="answers-layout mt-4 hidden" style="grid-template-columns: 1fr 1fr;">
+                <div class="host-answer-card color-blue" style="justify-content: center;">
+                    <div class="shape"><svg viewBox="0 0 100 100"><polygon points="50,15 90,85 10,85" fill="white" /></svg></div>
+                    <span id="host-ans-tf-0" style="font-size: 2rem;">True</span>
+                </div>
+                <div class="host-answer-card color-purple" style="justify-content: center;">
+                    <div class="shape"><svg viewBox="0 0 100 100"><polygon points="50,10 90,50 50,90 10,50" fill="white" /></svg></div>
+                    <span id="host-ans-tf-1" style="font-size: 2rem;">False</span>
+                </div>
+            </div>
+
+            <div id="host-ans-container-jumbled" class="mt-4 hidden glass-panel w-full fade-in-up" style="max-width: 1000px; padding: 2rem;">
+                <h3 class="text-center mb-4" style="color: var(--color-cyan);">Tap the fragments on your device to build the prompt!</h3>
+                <div id="host-jumbled-words" class="flex-center gap-3">
+                    <!-- words injected here -->
+                </div>
+            </div>
+
+            <div id="host-ans-container-text" class="mt-4 hidden glass-panel w-full fade-in-up text-center" style="max-width: 1000px; padding: 2rem;">
+                <h3 style="color: var(--color-cyan); font-size: 2rem;" class="mb-2">Type your answer on your device!</h3>
+                <p class="text-muted">Answers are hidden until time is up.</p>
+            </div>
+
+            <div id="host-ans-container-number" class="mt-4 hidden glass-panel w-full fade-in-up text-center" style="max-width: 1000px; padding: 2rem;">
+                <h3 style="color: var(--color-purple); font-size: 2rem;" class="mb-2">Slide to guess the correct number!</h3>
+                <p class="text-muted">Target is between 0 and 100.</p>
+            </div>
+
+            <div id="host-ans-container-poll" class="mt-4 hidden glass-panel w-full fade-in-up text-center" style="max-width: 1000px; padding: 2rem;">
+                <h3 style="color: #22c55e; font-size: 2rem;" class="mb-2">📊 Pick your answer on your device!</h3>
+                <p class="text-muted">This is an opinion poll — all answers are valid!</p>
+            </div>
+
+            <div id="host-ans-container-speedmath" class="mt-4 hidden glass-panel w-full fade-in-up text-center" style="max-width: 1000px; padding: 2rem;">
+                <h3 style="color: #FFD700; font-size: 2rem;" class="mb-2">⚡ Solve this math problem FAST!</h3>
+                <div id="host-math-equation-display" style="font-size: 4rem; font-weight: 900; margin: 1rem 0; letter-spacing: 4px;">?</div>
+            </div>
+            <div class="status-bar mt-3 flex-between w-full" style="max-width: 1000px;">
+                <div class="flex gap-2">
+                    <button id="btn-pause-timer" class="btn-text" style="color: var(--color-cyan);">Pause Timer</button>
+                    <button id="btn-resume-timer" class="btn-text hidden" style="color: #22c55e;">Resume Timer</button>
+                </div>
+                <span id="answers-count">0 Answers</span>
+                <button id="btn-skip-question" class="btn-text" style="color: #ef4444;">Skip Question >></button>
+            </div>
+        </section>
+
+        <section id="view-host-results" class="view host-layout">
+            <div class="glass-panel container-large text-center fade-in-up">
+                <h2>Results</h2>
+                <div class="results-chart mt-4" id="host-results-chart">
+                    <div class="bar-container">
+                        <div class="bar color-blue" id="bar-0" style="height: 0%"></div><span>0</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar color-purple" id="bar-1" style="height: 0%"></div><span>0</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar color-cyan" id="bar-2" style="height: 0%"></div><span>0</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar color-darkblue" id="bar-3" style="height: 0%"></div><span>0</span>
+                    </div>
+                </div>
+
+                <div id="host-mc-correct-answer" class="hidden mt-3 mb-4 p-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: var(--radius-md);">
+                    <h4 style="color: #22c55e; margin-bottom: 0.25rem;">Correct Answer</h4>
+                    <p id="host-mc-correct-text" style="font-size: 1.5rem; font-weight: bold; margin-top: 0.5rem;"></p>
+                </div>
+
+                <div id="host-results-jumbled" class="mt-4 hidden glass-panel container-large fade-in-up" style="max-width: 800px; margin: 2rem auto;">
+                    <h3 id="host-jumbled-correct-count" class="text-center mb-3" style="color: var(--color-cyan); font-size: 2rem;">0 participants ordered it correctly!</h3>
+                    <p class="text-small text-muted mb-2 text-center">Correct Sequence:</p>
+                    <div id="host-jumbled-correct-order" class="flex-center gap-3">
+                        <!-- words injected here -->
+                    </div>
+                </div>
+
+                <div id="host-results-text" class="mt-4 hidden glass-panel container-large fade-in-up" style="max-width: 800px; margin: 2rem auto;">
+                    <h3 id="host-text-correct-count" class="text-center mb-3" style="color: var(--color-cyan); font-size: 2rem;">0 participants typed it correctly!</h3>
+                    <p class="text-small text-muted mb-2 text-center">Correct Answer:</p>
+                    <h1 id="host-text-correct-answer" class="text-center" style="font-size: 3rem; color: white;">...</h1>
+                </div>
+
+                <div id="host-results-number" class="mt-4 hidden glass-panel container-large fade-in-up" style="max-width: 800px; margin: 2rem auto;">
+                    <h3 class="text-center mb-3" style="color: var(--color-purple); font-size: 2rem;">The exact answer was:</h3>
+                    <h1 id="host-number-correct-answer" class="text-center mb-4" style="font-size: 4rem; color: white;">0</h1>
+                    <div id="host-number-closest" class="text-center text-muted">No guesses submitted.</div>
+                </div>
+                <button id="btn-next-leaderboard" class="btn btn-primary mt-4">Next</button>
+            </div>
+        </section>
+
+        <section id="view-host-leaderboard" class="view host-layout" style="position: relative; overflow: hidden;">
+            <div id="host-emoji-container"
+                style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;">
+            </div>
+            <div class="glass-panel container-large text-center fade-in-up" style="position: relative; z-index: 2; width: 90%; max-width: 1200px;">
+                <h2>Leaderboard</h2>
+                
+                <div id="podium-display" class="podium-wrapper hidden">
+                    <div class="podium-block podium-2">
+                        <div class="podium-avatar" id="podium-p2-name">Player 2</div>
+                        <div class="podium-rank">2</div>
+                        <div id="podium-p2-score" style="color: white; font-weight: bold; margin-bottom: 1rem;">0 pts</div>
+                    </div>
+                    <div class="podium-block podium-1">
+                        <div class="podium-avatar" id="podium-p1-name">Player 1</div>
+                        <div class="podium-rank">1</div>
+                        <div id="podium-p1-score" style="color: white; font-weight: bold; margin-bottom: 1rem;">0 pts</div>
+                    </div>
+                    <div class="podium-block podium-3">
+                        <div class="podium-avatar" id="podium-p3-name">Player 3</div>
+                        <div class="podium-rank">3</div>
+                        <div id="podium-p3-score" style="color: white; font-weight: bold; margin-bottom: 1rem;">0 pts</div>
+                    </div>
+                </div>
+
+                <div id="leaderboard-list" class="leaderboard-container mt-4 mb-4" style="margin: 0 auto;"></div>
+                
+                <div class="flex-between w-full mt-4">
+                    <button id="btn-download-csv" class="btn btn-secondary">Download CSV</button>
+                    <button id="btn-next-question" class="btn btn-primary">Next Question</button>
+                </div>
+                <button id="btn-back-dashboard" class="btn btn-secondary w-full mt-3 hidden">← Back to
+                    Dashboard</button>
+            </div>
+        </section>
+
+    </main>
+
+    <audio id="sfx-tick" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3"
+        preload="auto"></audio>
+    <audio id="sfx-ding" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_c6ccf3232f.mp3"
+        preload="auto"></audio>
+    <audio id="sfx-powerup" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_7ce11db2f5.mp3"
+        preload="auto"></audio>
+
+    <div id="firebase-warning-modal" class="modal hidden">
+        <div class="modal-content glass-panel">
+            <h3>Firebase Not Configured</h3>
+            <p class="text-small mt-2 text-left">To make this game real-time, you must add your Firebase configuration
+                to <code>firebase-config.js</code>.</p>
+            <p class="text-small mt-2 text-left">For testing UI only, you can dismiss this, but live sync will not work.
+            </p>
+            <button id="btn-dismiss-firebase" class="btn btn-secondary mt-4 w-full">I Understand</button>
+        </div>
+    </div>
+
+    <!-- Live Preview Modal -->
+    <div id="preview-modal" class="modal hidden">
+        <div class="modal-content glass-panel" style="max-width: 1000px; padding: 0;">
+            <button class="modal-close-btn" id="btn-close-preview">×</button>
+            
+            <div id="preview-modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                <h3 style="color: var(--color-cyan); margin: 0;">Live Preview</h3>
+                <div id="preview-nav-controls" class="hidden flex gap-2">
+                    <button class="btn btn-secondary" id="btn-preview-prev" style="padding: 0.5rem 1rem;">← Prev</button>
+                    <span id="preview-counter" style="display: flex; align-items: center; padding: 0 1rem; font-weight: bold;">1/1</span>
+                    <button class="btn btn-secondary" id="btn-preview-next" style="padding: 0.5rem 1rem;">Next →</button>
+                </div>
+            </div>
+
+            <!-- Inside we inject the host question layout -->
+            <div id="preview-modal-body" style="padding: 2rem;">
+                <div class="question-header glass-panel w-full mb-4" style="max-width: none; display: flex; justify-content: space-between; align-items: center; padding: 2rem; font-size: 1.5rem; background: rgba(0,0,0,0.3);">
+                    <h2 id="preview-question-text">Question Text</h2>
+                    <div class="timer-circle" id="preview-timer">20</div>
+                </div>
+                
+                <div id="preview-question-image-container" class="mb-4 hidden text-center">
+                    <img id="preview-question-image" src="" style="max-height: 200px; max-width: 100%; object-fit: contain; border-radius: var(--radius-md); box-shadow: var(--glass-shadow);">
+                </div>
+
+                <!-- MC Layout -->
+                <div id="preview-ans-mc" class="answers-layout mt-4 hidden" style="max-width: none;">
+                    <div class="host-answer-card color-blue"><div class="shape"><svg viewBox="0 0 100 100"><polygon points="50,15 90,85 10,85" fill="white" /></svg></div><span id="preview-ans-0">Answer A</span></div>
+                    <div class="host-answer-card color-purple"><div class="shape"><svg viewBox="0 0 100 100"><polygon points="50,10 90,50 50,90 10,50" fill="white" /></svg></div><span id="preview-ans-1">Answer B</span></div>
+                    <div class="host-answer-card color-cyan"><div class="shape"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="white" /></svg></div><span id="preview-ans-2" style="color:black">Answer C</span></div>
+                    <div class="host-answer-card color-darkblue"><div class="shape"><svg viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" fill="white" /></svg></div><span id="preview-ans-3">Answer D</span></div>
+                </div>
+
+                <!-- TF Layout -->
+                <div id="preview-ans-tf" class="answers-layout mt-4 hidden" style="max-width: none; grid-template-columns: 1fr 1fr;">
+                    <div class="host-answer-card color-blue" style="justify-content: center;"><div class="shape"><svg viewBox="0 0 100 100"><polygon points="50,15 90,85 10,85" fill="white" /></svg></div><span id="preview-ans-tf-0" style="font-size: 2rem;">True</span></div>
+                    <div class="host-answer-card color-purple" style="justify-content: center;"><div class="shape"><svg viewBox="0 0 100 100"><polygon points="50,10 90,50 50,90 10,50" fill="white" /></svg></div><span id="preview-ans-tf-1" style="font-size: 2rem;">False</span></div>
+                </div>
+
+                <!-- Jumbled -->
+                <div id="preview-ans-jumbled" class="mt-4 hidden glass-panel w-full text-center" style="max-width: none; background: rgba(0,0,0,0.3);">
+                    <h3 style="color: var(--color-cyan);">Tap fragments on your device to build the prompt!</h3>
+                    <div id="preview-jumbled-words" class="flex-center gap-3 mt-4"></div>
+                </div>
+
+                <!-- Type Answer -->
+                <div id="preview-ans-text" class="mt-4 hidden glass-panel w-full text-center" style="max-width: none; background: rgba(0,0,0,0.3);">
+                    <h3 style="color: var(--color-cyan); font-size: 2rem;" class="mb-2">Type your answer on your device!</h3>
+                </div>
+
+                <!-- Number Guess -->
+                <div id="preview-ans-number" class="mt-4 hidden glass-panel w-full text-center" style="max-width: none; background: rgba(0,0,0,0.3);">
+                    <h3 style="color: var(--color-purple); font-size: 2rem;" class="mb-2">Slide to guess the correct number!</h3>
+                </div>
+
+                <!-- Poll -->
+                <div id="preview-ans-poll" class="mt-4 hidden glass-panel w-full text-center" style="max-width: none; background: rgba(0,0,0,0.3);">
+                    <h3 style="color: #22c55e; font-size: 2rem;" class="mb-2">📊 Pick your answer on your device!</h3>
+                </div>
+
+                <!-- Speed Math -->
+                <div id="preview-ans-speedmath" class="mt-4 hidden glass-panel w-full text-center" style="max-width: none; background: rgba(0,0,0,0.3);">
+                    <h3 style="color: #FFD700; font-size: 2rem;" class="mb-2">⚡ Solve this math problem FAST!</h3>
+                    <div id="preview-math-equation-display" style="font-size: 4rem; font-weight: 900; margin: 1rem 0; letter-spacing: 4px;">?</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
