@@ -463,9 +463,6 @@ function buildMakerBlock(typeSelect) {
 
 
 function setupHostManagementWorkflow() {
-    document.getElementById("btn-import-presets")?.addEventListener("click", () => {
-        alert("System Modules loaded implicitly through script runtime assets.");
-    });
     document.getElementById("btn-open-maker")?.addEventListener("click", () => {
         editingQuizIndex = null;
         document.getElementById("maker-quiz-title").value = "";
@@ -508,7 +505,7 @@ function setupHostManagementWorkflow() {
         }
     });
 
-    document.getElementById("btn-save-quiz")?.addEventListener("click", () => {
+    document.getElementById("btn-save-quiz")?.addEventListener("click", async () => {
         const title = document.getElementById("maker-quiz-title").value.trim();
         if (!title) { alert("Give your quiz a title first!"); return; }
         const qBlocks = document.querySelectorAll(".maker-q-block");
@@ -581,12 +578,36 @@ function setupHostManagementWorkflow() {
         try {
             localStorage.setItem("copilot_custom_quizzes", JSON.stringify(copilotPresets));
         } catch (e) {}
+        await syncPresetsToFirebase();
         enterHostDashboard();
     });
 }
 
+async function syncPresetsToFirebase() {
+    if (!isFirebaseEnabled) return;
+    try {
+        await set(ref(database, 'quizzes/global'), copilotPresets);
+    } catch (err) {
+        console.warn("Firebase sync failed:", err);
+    }
+}
+
+async function loadPresetsFromFirebase() {
+    if (!isFirebaseEnabled) return;
+    try {
+        const snap = await get(ref(database, 'quizzes/global'));
+        if (snap.exists()) {
+            copilotPresets = snap.val();
+            localStorage.setItem("copilot_custom_quizzes", JSON.stringify(copilotPresets));
+        }
+    } catch (err) {
+        console.warn("Firebase load failed:", err);
+    }
+}
+
 async function enterHostDashboard() {
     currentRole = "host";
+    await loadPresetsFromFirebase();
     switchView("hostSetup");
     renderQuizSelector();
     
@@ -698,6 +719,7 @@ function renderQuizSelector() {
                 try {
                     localStorage.setItem("copilot_custom_quizzes", JSON.stringify(copilotPresets));
                 } catch(err) {}
+                syncPresetsToFirebase();
                 renderQuizSelector();
             }
         });
