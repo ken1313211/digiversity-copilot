@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, set, get, update, onValue, remove, child, push, onChildAdded, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, set, get, update, onValue, remove, child, push, onChildAdded, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
@@ -47,5 +47,5 @@ try {
     console.error("Firebase initialization error:", error);
 }
 
-export { database, auth, storage, ref, set, get, update, onValue, remove, child, push, onChildAdded, runTransaction, storageRef, uploadBytes, getDownloadURL, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, isFirebaseEnabled, onAuthStateChanged };
+export { database, auth, storage, ref, set, get, update, onValue, remove, child, push, onChildAdded, runTransaction, onDisconnect, storageRef, uploadBytes, getDownloadURL, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, isFirebaseEnabled, onAuthStateChanged };
 export const getCurrentUser = () => currentUser;
