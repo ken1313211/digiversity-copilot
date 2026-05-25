@@ -1,5 +1,5 @@
 import {
-    database, auth, ref, set, get, update, onValue, remove, child, push, onChildAdded, runTransaction,
+    database, auth, ref, set, get, update, onValue, remove, child, push, onChildAdded, runTransaction, onDisconnect,
     signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, isFirebaseEnabled, getCurrentUser, onAuthStateChanged
 } from "./firebase-config.js";
 
@@ -67,6 +67,7 @@ let sessionTotalCorrectAnswersCount = 0;
 
 // Player data tracking
 let hasAnsweredCurrent = false;
+let playerActiveQuestionIndex = -1;
 let currentQuestionStartTime = 0;
 let currentScore = 0;
 let currentStreak = 0;
@@ -121,6 +122,14 @@ function purgeActiveListeners() {
     if (playerLobbyListener) { playerLobbyListener(); playerLobbyListener = null; }
     if (answersListener) { answersListener(); answersListener = null; }
     if (emojiListener) { emojiListener(); emojiListener = null; }
+    playerActiveQuestionIndex = -1;
+    sessionStorage.removeItem("player_session_pin");
+    sessionStorage.removeItem("player_nickname");
+    sessionStorage.removeItem("player_key");
+    sessionStorage.removeItem("player_role");
+    sessionStorage.removeItem("host_session_pin");
+    sessionStorage.removeItem("host_role");
+    sessionStorage.removeItem("host_quiz");
 }
 
 // ==========================================
@@ -633,6 +642,17 @@ async function enterHostDashboard() {
     switchView("hostSetup");
     renderQuizSelector();
     
+    const activePin = sessionStorage.getItem("host_session_pin");
+    const banner = document.getElementById("host-active-session-banner");
+    if (banner) {
+        if (activePin) {
+            document.getElementById("banner-active-pin").innerText = activePin;
+            banner.classList.remove("hidden");
+        } else {
+            banner.classList.add("hidden");
+        }
+    }
+    
     let history = [];
     const fbHistory = await loadHistoryFromFirebase();
     if (fbHistory) {
@@ -753,6 +773,37 @@ function renderQuizSelector() {
             }
         });
     });
+
+    document.getElementById("btn-start-game")?.addEventListener("click", () => { 
+        hostActiveQuestionIndex = 0; 
+        executeQuestionBroadcast(); 
+    });
+
+    document.getElementById("btn-cancel-session")?.addEventListener("click", () => {
+        terminateRoomInstance();
+    });
+
+    document.getElementById("btn-host-end-game-early")?.addEventListener("click", () => {
+        if (confirm("End game early and skip to final results?")) {
+            hostActiveQuestionIndex = currentQuizData.questions.length;
+            clearInterval(timerInterval);
+            presentHostLeaderboardView();
+        }
+    });
+
+    document.getElementById("btn-banner-rejoin")?.addEventListener("click", () => {
+        recoverHostSession();
+    });
+
+    document.getElementById("btn-banner-destroy")?.addEventListener("click", () => {
+        if (confirm("Are you sure you want to completely destroy the active live session?")) {
+            terminateRoomInstance();
+        }
+    });
+
+    document.getElementById("btn-back-dashboard")?.addEventListener("click", () => {
+        terminateRoomInstance();
+    });
 }
 
 function loadQuizIntoMaker(index) {
@@ -820,12 +871,18 @@ function loadQuizIntoMaker(index) {
 }
 
 async function initializeLiveRoom(quiz) {
+    currentRole = "host";
     currentQuizData = quiz;
     currentSessionPin = Math.floor(100000 + Math.random() * 900000).toString();
     sessionTotalAnswersCount = 0;
     sessionTotalCorrectAnswersCount = 0;
 
+    sessionStorage.setItem("host_session_pin", currentSessionPin);
+    sessionStorage.setItem("host_role", "host");
+    sessionStorage.setItem("host_quiz", JSON.stringify(currentQuizData));
+
     document.getElementById("display-game-pin").innerText = currentSessionPin;
+    updateHostPinDisplays();
     document.getElementById("display-join-url").innerHTML = `Join at <strong>${window.location.origin}</strong>`;
 
     const qrContainer = document.getElementById("qr-code-container");
@@ -861,7 +918,7 @@ function trackLobbyRegistrations() {
             return;
         }
         const data = snapshot.val();
-        const keys = Object.keys(data);
+        const keys = Object.keys(data).filter(k => data[k].online !== false);
         countDisplay.innerText = keys.length;
         startBtn.disabled = keys.length === 0;
 
@@ -883,19 +940,6 @@ function trackLobbyRegistrations() {
     emojiListener = onChildAdded(ref(database, `sessions/${currentSessionPin}/reactions`), (snapshot) => {
         if (snapshot.exists()) spawnReactionOnHostScreen(snapshot.val().emoji);
     });
-
-    document.getElementById("btn-start-game").onclick = () => { hostActiveQuestionIndex = 0; executeQuestionBroadcast(); };
-    document.getElementById("btn-cancel-session").onclick = () => terminateRoomInstance();
-    const btnEndEarly = document.getElementById("btn-host-end-game-early");
-    if (btnEndEarly) {
-        btnEndEarly.onclick = () => {
-            if (confirm("End game early and skip to final results?")) {
-                hostActiveQuestionIndex = currentQuizData.questions.length;
-                clearInterval(timerInterval);
-                presentHostLeaderboardView();
-            }
-        };
-    }
 }
 
 async function terminateRoomInstance() {
@@ -907,7 +951,7 @@ async function terminateRoomInstance() {
 // ==========================================
 // 5. HOST QUESTION BROADCAST ENGINE
 // ==========================================
-async function executeQuestionBroadcast() {
+async function executeQuestionBroadcast(isReconnect = false) {
     isTimerPaused = false;
     document.getElementById("btn-pause-timer").classList.remove("hidden");
     document.getElementById("btn-resume-timer").classList.add("hidden");
@@ -987,27 +1031,50 @@ async function executeQuestionBroadcast() {
     document.getElementById("answers-count").innerText = "0 Answers";
 
     if (isFirebaseEnabled) {
-        await update(gameSessionRef, { 
-            status: "question", 
-            currentQuestion: hostActiveQuestionIndex,
-            timeLimit: q.timeLimit || 20,
-            questionType: q.type || "multiple-choice",
-            questionWords: q.words || null,
-            questionOptions: q.options || null,
-            questionEquation: q.equation || null,
-            questionStartTime: Date.now() 
-        });
+        if (!isReconnect) {
+            await update(gameSessionRef, { 
+                status: "question", 
+                currentQuestion: hostActiveQuestionIndex,
+                timeLimit: q.timeLimit || 20,
+                questionType: q.type || "multiple-choice",
+                questionWords: q.words || null,
+                questionOptions: q.options || null,
+                questionEquation: q.equation || null,
+                questionStartTime: Date.now(),
+                answers: null,
+                reactions: null
+            });
+        }
         if (answersListener) answersListener();
         answersListener = onValue(ref(database, `sessions/${currentSessionPin}/answers`), (snapshot) => {
             if (snapshot.exists()) {
                 hostAnswersMap = snapshot.val();
                 document.getElementById("answers-count").innerText = `${Object.keys(hostAnswersMap).length} Answers`;
+            } else {
+                hostAnswersMap = {};
+                document.getElementById("answers-count").innerText = "0 Answers";
             }
         });
     }
 
     switchView("hostQuestion");
-    runTimerCountdown(q.timeLimit);
+    
+    if (isReconnect) {
+        get(ref(database, `sessions/${currentSessionPin}`)).then((snap) => {
+            if (snap.exists()) {
+                const session = snap.val();
+                const elapsed = Math.floor((Date.now() - (session.questionStartTime || Date.now())) / 1000);
+                const remaining = Math.max(0, (session.timeLimit || 20) - elapsed);
+                runTimerCountdown(remaining);
+            } else {
+                runTimerCountdown(q.timeLimit);
+            }
+        }).catch(() => {
+            runTimerCountdown(q.timeLimit);
+        });
+    } else {
+        runTimerCountdown(q.timeLimit);
+    }
 }
 
 function runTimerCountdown(duration) {
@@ -1363,17 +1430,35 @@ async function presentHostLeaderboardView() {
 // 6. PLAYER ARCHITECTURE LOGIC PIPELINES
 // ==========================================
 function setupPlayerParticipationWorkflow() {
+    const savedName = localStorage.getItem("copilot_last_nickname");
+    if (savedName) {
+        const inputNickname = document.getElementById("input-nickname");
+        if (inputNickname) inputNickname.value = savedName;
+    }
+
     const joinForm = document.getElementById("form-join");
     joinForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
         const pinInput = document.getElementById("input-pin").value.trim();
         const nameInput = document.getElementById("input-nickname").value.trim();
+        
+        if (nameInput.length < 2) {
+            alert("Please enter a nickname with at least 2 characters.");
+            return;
+        }
+
+        localStorage.setItem("copilot_last_nickname", nameInput);
         const submitBtn = document.getElementById("btn-join-submit");
 
         if (!isFirebaseEnabled) {
             myNickname = nameInput;
             currentSessionPin = pinInput;
+            currentRole = "player";
+            sessionStorage.setItem("player_session_pin", currentSessionPin);
+            sessionStorage.setItem("player_nickname", myNickname);
+            sessionStorage.setItem("player_role", "player");
             document.getElementById("display-player-name").innerText = myNickname;
+            updatePlayerPinDisplays();
             switchView("playerLobby");
             return;
         }
@@ -1386,8 +1471,8 @@ function setupPlayerParticipationWorkflow() {
                 alert("Game room code not found.");
                 return;
             }
-            if (sessionSnap.val().status !== "lobby") {
-                alert("Game connection pathway is already closed.");
+            if (sessionSnap.val().status === "gameover") {
+                alert("This game session has already ended.");
                 return;
             }
 
@@ -1396,10 +1481,28 @@ function setupPlayerParticipationWorkflow() {
             currentRole = "player";
 
             const playerListRef = ref(database, `sessions/${pinInput}/players`);
-            const newPlayerRef = push(playerListRef);
-            myPlayerKey = newPlayerRef.key;
+            
+            let existingKey = null;
+            if (sessionSnap.val().players) {
+                const playersData = sessionSnap.val().players;
+                for (const [key, pData] of Object.entries(playersData)) {
+                    if (pData.nickname.toLowerCase() === nameInput.toLowerCase()) {
+                        existingKey = key;
+                        break;
+                    }
+                }
+            }
 
-            await set(newPlayerRef, { nickname: myNickname, score: 0, streak: 0, lastPointsEarned: 0, wasCorrect: false });
+            if (existingKey) {
+                myPlayerKey = existingKey;
+                await set(ref(database, `sessions/${pinInput}/players/${myPlayerKey}/online`), true);
+            } else {
+                const newPlayerRef = push(playerListRef);
+                myPlayerKey = newPlayerRef.key;
+                await set(newPlayerRef, { nickname: myNickname, score: 0, streak: 0, lastPointsEarned: 0, wasCorrect: false, online: true });
+            }
+            onDisconnect(ref(database, `sessions/${pinInput}/players/${myPlayerKey}/online`)).set(false);
+            
             document.getElementById("display-player-name").innerText = myNickname;
             switchView("playerLobby");
             bindPlayerSessionSyncPipeline();
@@ -1409,7 +1512,9 @@ function setupPlayerParticipationWorkflow() {
             console.warn("Falling back automatically to sandbox fallback loop runtime mode.");
             myNickname = nameInput;
             currentSessionPin = pinInput;
+            currentRole = "player";
             document.getElementById("display-player-name").innerText = myNickname;
+            updatePlayerPinDisplays();
             switchView("playerLobby");
         } finally {
             submitBtn.disabled = false;
@@ -1417,10 +1522,93 @@ function setupPlayerParticipationWorkflow() {
     });
 
     setupPlayerReactionPipelines();
+
+    document.querySelectorAll(".btn-player-sync").forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (isFirebaseEnabled && currentSessionPin && myPlayerKey) {
+                bindPlayerSessionSyncPipeline();
+                const origText = btn.innerText;
+                btn.innerText = "Synced! ✓";
+                btn.style.color = "#22c55e";
+                setTimeout(() => {
+                    btn.innerText = origText;
+                    btn.style.color = "";
+                }, 1000);
+            }
+        });
+    });
+}
+
+
+async function recoverHostSession() {
+    const savedPin = sessionStorage.getItem("host_session_pin");
+    const savedRole = sessionStorage.getItem("host_role");
+    const savedQuiz = sessionStorage.getItem("host_quiz");
+
+    if (savedPin && savedRole === "host" && savedQuiz) {
+        currentSessionPin = savedPin;
+        currentRole = "host";
+        currentQuizData = JSON.parse(savedQuiz);
+        gameSessionRef = ref(database, `sessions/${currentSessionPin}`);
+
+        try {
+            const snap = await get(ref(database, `sessions/${currentSessionPin}`));
+            if (!snap.exists()) {
+                purgeActiveListeners();
+                enterHostDashboard();
+                return;
+            }
+            const session = snap.val();
+            hostActiveQuestionIndex = session.currentQuestion !== undefined ? session.currentQuestion : 0;
+
+            document.getElementById("display-game-pin").innerText = currentSessionPin;
+            updateHostPinDisplays();
+            document.getElementById("display-join-url").innerHTML = `Join at <strong>${window.location.origin}</strong>`;
+            const qrContainer = document.getElementById("qr-code-container");
+            if (qrContainer) {
+                qrContainer.innerHTML = "";
+                new QRCode(qrContainer, {
+                    text: `${window.location.origin}?pin=${currentSessionPin}`,
+                    width: 160, height: 160, colorDark: "#0A2E5C", colorLight: "#FFFFFF"
+                });
+            }
+
+            if (session.status === "lobby") {
+                trackLobbyRegistrations();
+                switchView("hostLobby");
+            } else if (session.status === "question") {
+                await executeQuestionBroadcast(true);
+            } else if (session.status === "results") {
+                concludeQuestionEvaluation();
+            } else if (session.status === "gameover") {
+                purgeActiveListeners();
+                enterHostDashboard();
+            } else {
+                presentHostLeaderboardView();
+            }
+            console.log("Restored host session from sessionStorage for PIN:", currentSessionPin);
+        } catch (err) {
+            console.error("Error recovering host session:", err);
+            enterHostDashboard();
+        }
+    }
+}
+
+function updatePlayerPinDisplays() {
+    document.querySelectorAll(".display-player-pin").forEach(el => {
+        el.innerText = currentSessionPin || "---";
+    });
+}
+
+function updateHostPinDisplays() {
+    document.querySelectorAll(".display-host-pin").forEach(el => {
+        el.innerText = currentSessionPin || "---";
+    });
 }
 
 function bindPlayerSessionSyncPipeline() {
     if (!currentSessionPin || !myPlayerKey) return;
+    updatePlayerPinDisplays();
     sessionStateListener = onValue(ref(database, `sessions/${currentSessionPin}`), (snapshot) => {
         if (!snapshot.exists()) {
             purgeActiveListeners();
@@ -1444,9 +1632,14 @@ function bindPlayerSessionSyncPipeline() {
 }
 
 function preparePlayerInputInterface(session) {
-    if (hasAnsweredCurrent) return;
+    const sessionQIndex = session.currentQuestion !== undefined ? session.currentQuestion : 0;
+    if (playerActiveQuestionIndex !== sessionQIndex) {
+        playerActiveQuestionIndex = sessionQIndex;
+        hasAnsweredCurrent = false;
+    } else {
+        if (hasAnsweredCurrent) return;
+    }
     currentQuestionStartTime = session.questionStartTime || Date.now();
-    hasAnsweredCurrent = false;
 
     document.getElementById("player-score-display").innerText = currentScore;
     document.getElementById("player-waiting-msg").classList.add("hidden");
