@@ -1,0 +1,13 @@
+{
+  "name": "copilot-quiz",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check app.js && node --check firebase-config.js",
+    "test": "node --test qa/*.test.cjs"
+  },
+  "devDependencies": {
+    "firebase": "^10.8.0",
+    "jsdom": "^24.1.3"
+  }
+}
